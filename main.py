@@ -1,111 +1,164 @@
 import pygame
 import time
-from collections import deque
 
-# Initialize pygame
 pygame.init()
 
-# Colors
+# رنگ‌ها
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-BLUE = (0, 0, 255)
+GRAY = (230, 230, 230)
+LIGHT_BLUE = (40, 50, 70)
+GREEN = (80, 220, 180)
+RED = (255, 120, 120)
+PATH_COLOR = (255, 190, 60)
+BUTTON_COLOR = (60, 140, 255)
+TEXT_COLOR = (240, 240, 240)
 
-# Set the screen size
-screen_width = 600
-screen_height = 600
-screen = pygame.display.set_mode((screen_width, screen_height))
-pygame.display.set_caption('Path Visualization')
+# صفحه
+WIDTH, HEIGHT = 600, 700
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("All Paths Visualizer")
 
-# Font for displaying text
-font = pygame.font.SysFont('arial', 20)
+# فونت
+font = pygame.font.SysFont("Segoe UI", 22)
+big_font = pygame.font.SysFont("Segoe UI", 28, bold=True)
 
-def draw_grid(n):
-    """Draw the grid and label each cell with coordinates."""
-    cell_size = screen_width // n
-    for x in range(n):
-        for y in range(n):
-            pygame.draw.rect(screen, WHITE, (x * cell_size, y * cell_size, cell_size, cell_size), 1)
-            text = font.render(f"({x},{y})", True, BLACK)
-            screen.blit(text, (x * cell_size + 5, y * cell_size + 5))
+# شروع
+start = (0, 0)
+grid_size = 5  # پیش‌فرض
 
-def draw_path(path, n):
-    """Draw the path step by step."""
-    cell_size = screen_width // n
-    for i in range(len(path)):
-        x, y = path[i]
-        pygame.draw.rect(screen, GREEN, (x * cell_size, y * cell_size, cell_size, cell_size))
+def draw_grid():
+    cell_size = WIDTH // grid_size
+    for x in range(grid_size):
+        for y in range(grid_size):
+            rect = pygame.Rect(x * cell_size + 1, y * cell_size + 1, cell_size - 2, cell_size - 2)
+            pygame.draw.rect(screen, GRAY, rect, border_radius=4)
+
+def draw_points(end):
+    cell_size = WIDTH // grid_size
+    pygame.draw.rect(screen, GREEN, (start[0]*cell_size+2, start[1]*cell_size+2, cell_size-4, cell_size-4), border_radius=4)
+    pygame.draw.rect(screen, RED, (end[0]*cell_size+2, end[1]*cell_size+2, cell_size-4, cell_size-4), border_radius=4)
+
+def draw_path(path):
+    cell_size = WIDTH // grid_size
+    for (x, y) in path:
+        pygame.draw.rect(screen, PATH_COLOR, (x*cell_size+2, y*cell_size+2, cell_size-4, cell_size-4), border_radius=4)
         pygame.display.update()
-        time.sleep(0.5)  # Delay between steps to show the path
+        pygame.time.delay(80)
 
-def find_paths(n):
-    """Find all possible paths from the top-left to the bottom-right corner."""
-    dp = [[0] * n for _ in range(n)]
-    dp[0][0] = 1  # Start point
+def reset_board(end):
+    screen.fill(LIGHT_BLUE)
+    draw_grid()
+    draw_points(end)
+    pygame.display.update()
 
-    for i in range(n):
-        for j in range(n):
-            if i == 0 and j == 0:
-                continue
-            if i > 0:
-                dp[i][j] += dp[i - 1][j]
-            if j > 0:
-                dp[i][j] += dp[i][j - 1]
+def get_neighbors_right_down(x, y, size):
+    neighbors = []
+    if x + 1 < size:
+        neighbors.append((x + 1, y))
+    if y + 1 < size:
+        neighbors.append((x, y + 1))
+    return neighbors
 
-    # Collect all paths using backtracking
+def find_all_paths(start, end, size):
     paths = []
-    find_all_paths(paths, [], n - 1, n - 1, dp)
+
+    def dfs(current, path):
+        if current == end:
+            paths.append(path.copy())
+            return
+        for neighbor in get_neighbors_right_down(*current, size):
+            if neighbor not in path:
+                path.append(neighbor)
+                dfs(neighbor, path)
+                path.pop()
+
+    dfs(start, [start])
     return paths
 
-def find_all_paths(paths, current_path, i, j, dp):
-    """Backtracking to find all the paths."""
-    if i == 0 and j == 0:
-        current_path.append((i, j))
-        paths.append(list(current_path))
-        current_path.pop()
-        return
+def draw_button(text, x, y, w, h, color):
+    pygame.draw.rect(screen, color, (x, y, w, h), border_radius=10)
+    label = font.render(text, True, WHITE)
+    screen.blit(label, (x + (w - label.get_width()) // 2, y + (h - label.get_height()) // 2))
 
-    if i > 0 and dp[i - 1][j] > 0:
-        current_path.append((i, j))
-        find_all_paths(paths, current_path, i - 1, j, dp)
-        current_path.pop()
+def draw_text(text, x, y, color=TEXT_COLOR, center=True, big=False):
+    f = big_font if big else font
+    label = f.render(text, True, color)
+    if center:
+        screen.blit(label, (x - label.get_width() // 2, y))
+    else:
+        screen.blit(label, (x, y))
 
-    if j > 0 and dp[i][j - 1] > 0:
-        current_path.append((i, j))
-        find_all_paths(paths, current_path, i, j - 1, dp)
-        current_path.pop()
+def choose_grid_size():
+    choosing = True
+    selected_size = None
 
-def main():
-    """Main program that runs the visualization."""
-    running = True
-    n = int(input("Please enter the grid size: "))
-    
-    while running:
-        screen.fill(BLACK)
-        draw_grid(n)
+    while choosing:
+        screen.fill(LIGHT_BLUE)
+        draw_text("Choose Grid Size", WIDTH // 2, 50, big=True)
 
-        # Find all possible paths
-        paths = find_paths(n)
-        
-        # Draw each path step by step
-        for path in paths:
-            draw_path(path, n)
-        
+        for i in range(3, 11):
+            x = 60 + ((i - 3) % 4) * 130
+            y = 150 + ((i - 3) // 4) * 100
+            draw_button(f"{i} x {i}", x, y, 100, 60, BUTTON_COLOR)
+
         pygame.display.update()
 
-        # Wait for the user to input a new grid size
-        running = False
-        while not running:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_r:
-                        running = True
-                        n = int(input("Please enter a new grid size: "))
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            elif e.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = pygame.mouse.get_pos()
+                for i in range(3, 11):
+                    x = 60 + ((i - 3) % 4) * 130
+                    y = 150 + ((i - 3) // 4) * 100
+                    if x <= mx <= x + 100 and y <= my <= y + 60:
+                        selected_size = i
+                        choosing = False
                         break
+    return selected_size
 
-# Run the program
+def main():
+    global grid_size
+
+    grid_size = choose_grid_size()
+    cell_size = WIDTH // grid_size
+    end = (grid_size - 1, grid_size - 1)
+
+    running = True
+    show_paths = False
+    total_paths = 0
+
+    while running:
+        screen.fill(LIGHT_BLUE)
+        draw_grid()
+        draw_points(end)
+        draw_button("Show All Paths", 200, 620, 200, 50, BUTTON_COLOR)
+
+        if total_paths:
+            draw_text(f"Total Paths: {total_paths}", WIDTH // 2, 580, color=(200, 255, 200), big=False)
+
+        pygame.display.update()
+
+        if show_paths:
+            paths = find_all_paths(start, end, grid_size)
+            total_paths = len(paths)
+            for path in paths:
+                reset_board(end)
+                draw_path(path)
+                time.sleep(0.3)
+            show_paths = False
+
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                running = False
+            elif e.type == pygame.MOUSEBUTTONDOWN:
+                mx, my = pygame.mouse.get_pos()
+                if 200 <= mx <= 400 and 620 <= my <= 670:
+                    show_paths = True
+
+    pygame.quit()
+
 if __name__ == "__main__":
     main()
